@@ -1,108 +1,101 @@
-// Simulación de base de datos de usuarios
-let usuarios = [];
+const Usuario = require('../models/Usuario');
 
 // Controlador para registrar un nuevo usuario
-function registrarUsuario(req, res) {
+async function registrarUsuario(req, res) {
     const { nombre, email, contraseña, estadoCuenta, rol } = req.body;
 
-    // Validación básica
-    if (!nombre || !email || !contraseña || !estadoCuenta || !rol) {
-        return res.status(400).json({ mensaje: 'Por favor, proporciona nombre, email, contraseña, estado de cuenta y rol' });
+    try {
+        // Verificar si el email ya está en uso
+        const existeUsuario = await Usuario.findOne({ email });
+        if (existeUsuario) {
+            return res.status(400).json({ mensaje: 'El correo electrónico ya está registrado' });
+        }
+
+        // Crear nuevo usuario
+        const nuevoUsuario = new Usuario({
+            nombre,
+            email,
+            contraseña,
+            estadoCuenta,
+            rol,
+        });
+
+        // Guardar usuario en la base de datos
+        await nuevoUsuario.save();
+
+        res.status(201).json({ mensaje: 'Usuario registrado exitosamente', usuario: nuevoUsuario });
+    } catch (error) {
+        console.error('Error al registrar usuario:', error);
+        res.status(500).json({ mensaje: 'Error interno al registrar usuario' });
     }
-
-    // Validación de estado de cuenta
-    if (estadoCuenta !== 'activo' && estadoCuenta !== 'desactivado') {
-        return res.status(400).json({ mensaje: 'El estado de cuenta debe ser "activo" o "desactivado"' });
-    }
-
-    // Validación de rol
-    if (rol !== 'cliente' && rol !== 'administrador') {
-        return res.status(400).json({ mensaje: 'El rol debe ser "cliente" o "administrador"' });
-    }
-
-    // Verificar si el email ya está en uso
-    const existeUsuario = usuarios.find(u => u.email === email);
-    if (existeUsuario) {
-        return res.status(400).json({ mensaje: 'El correo electrónico ya está registrado' });
-    }
-
-    // Simulación de almacenamiento en base de datos
-    const nuevoUsuario = { 
-        id: usuarios.length + 1, 
-        nombre, 
-        email, 
-        contraseña, 
-        estadoCuenta, 
-        rol 
-    };
-    usuarios.push(nuevoUsuario);
-
-    res.status(201).json({ mensaje: 'Usuario registrado exitosamente', usuario: nuevoUsuario });
 }
 
 // Controlador para obtener todos los usuarios
-function obtenerUsuarios(req, res) {
-    res.json({ usuarios });
+async function obtenerUsuarios(req, res) {
+    try {
+        const usuarios = await Usuario.find();
+        res.json({ usuarios });
+    } catch (error) {
+        console.error('Error al obtener usuarios:', error);
+        res.status(500).json({ mensaje: 'Error interno al obtener usuarios' });
+    }
 }
 
 // Controlador para obtener un usuario por su ID
-function obtenerUsuarioPorId(req, res) {
-    const id = parseInt(req.params.id);
-    const usuario = usuarios.find(u => u.id === id);
+async function obtenerUsuarioPorId(req, res) {
+    const id = req.params.id;
 
-    if (!usuario) {
-        return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    try {
+        const usuario = await Usuario.findById(id);
+        if (!usuario) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+        }
+        res.json({ usuario });
+    } catch (error) {
+        console.error('Error al obtener usuario por ID:', error);
+        res.status(500).json({ mensaje: 'Error interno al obtener usuario por ID' });
     }
-
-    res.json({ usuario });
 }
 
 // Controlador para editar un usuario por su ID
-function editarUsuario(req, res) {
-    const id = parseInt(req.params.id);
+async function editarUsuario(req, res) {
+    const id = req.params.id;
     const { nombre, email, estadoCuenta, rol } = req.body;
 
-    // Validación básica
-    if (!nombre && !email && !estadoCuenta && !rol) {
-        return res.status(400).json({ mensaje: 'Por favor, proporciona al menos nombre, email, estado de cuenta o rol para actualizar' });
-    }
+    try {
+        const usuario = await Usuario.findById(id);
+        if (!usuario) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+        }
 
-    const usuarioIndex = usuarios.findIndex(u => u.id === id);
+        if (nombre) usuario.nombre = nombre;
+        if (email) usuario.email = email;
+        if (estadoCuenta) usuario.estadoCuenta = estadoCuenta;
+        if (rol) usuario.rol = rol;
 
-    if (usuarioIndex === -1) {
-        return res.status(404).json({ mensaje: 'Usuario no encontrado' });
-    }
+        await usuario.save();
 
-    // Actualizar usuario
-    if (nombre) {
-        usuarios[usuarioIndex].nombre = nombre;
+        res.json({ mensaje: 'Usuario actualizado correctamente', usuario });
+    } catch (error) {
+        console.error('Error al editar usuario:', error);
+        res.status(500).json({ mensaje: 'Error interno al editar usuario' });
     }
-    if (email) {
-        usuarios[usuarioIndex].email = email;
-    }
-    if (estadoCuenta) {
-        usuarios[usuarioIndex].estadoCuenta = estadoCuenta;
-    }
-    if (rol) {
-        usuarios[usuarioIndex].rol = rol;
-    }
-
-    res.json({ mensaje: 'Usuario actualizado correctamente', usuario: usuarios[usuarioIndex] });
 }
 
 // Controlador para eliminar un usuario por su ID
-function eliminarUsuario(req, res) {
-    const id = parseInt(req.params.id);
-    const usuarioIndex = usuarios.findIndex(u => u.id === id);
+async function eliminarUsuario(req, res) {
+    const id = req.params.id;
 
-    if (usuarioIndex === -1) {
-        return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+    try {
+        const usuario = await Usuario.findByIdAndDelete(id);
+        if (!usuario) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+        }
+        res.json({ mensaje: 'Usuario eliminado correctamente' });
+    } catch (error) {
+        console.error('Error al eliminar usuario:', error);
+        res.status(500).json({ mensaje: 'Error interno al eliminar usuario' });
     }
-
-    // Eliminar usuario de la lista
-    usuarios.splice(usuarioIndex, 1);
-
-    res.json({ mensaje: 'Usuario eliminado correctamente' });
 }
 
 module.exports = {
